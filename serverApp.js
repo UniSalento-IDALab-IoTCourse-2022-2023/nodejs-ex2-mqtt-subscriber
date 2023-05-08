@@ -2,6 +2,15 @@ var express = require("express");
 const MongoClient = require('mongodb').MongoClient;
 const WebSocket = require('ws');
 const path = require('path');
+const mqtt=require('mqtt');
+
+var mqttClient = mqtt.connect("mqtt://mqtt.eclipseprojects.io",{clientId:"mqttjs041"});
+mqttClient.on("connect",function(){
+    console.log("connected");
+});
+mqttClient.on("error",function(error){
+    console.log("Can't connect"+error);
+});
 
 const uri = 'mongodb://130.192.137.1/TemperatureDB';
 
@@ -24,6 +33,31 @@ app.use(
     })
 )
 app.use(express.json());
+
+
+mqttClient.on('message',function(topic, message, packet){console.log("message is "+ message);
+    console.log("topic is "+ topic);
+    var messageJSON = JSON.parse(message);
+    var temperature = messageJSON.temperature;
+    var timestamp = messageJSON.timestamp;
+    var sensor = messageJSON.sensor;
+
+    async function pushToClient(){
+        wss.clients.forEach(function each(client) {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(temperature);
+            }
+        });
+    }
+    pushToClient().catch(console.dir);
+});
+
+
+var topic="test-topic-handson/data";
+console.log("subscribing to topic: "+topic);
+mqttClient.subscribe(topic); //single topic
+
+
 app.post("/temperature", (req, res, next) => {
     var temperature = req.body.temperature;
     var timestamp = req.body.timestamp;
